@@ -51,6 +51,10 @@ class User(db.Model):
         self.date_of_birth = date_of_birth
         self.role = role
         self.status = status
+        self.failed_login_attempts = 0
+        
+        
+    
         
         
         

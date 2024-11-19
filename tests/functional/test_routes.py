@@ -192,3 +192,62 @@ def test_create_account_missing_fields(testing_client):
     """
     response = testing_client.post('/accounts', json={'name': 'Incomplete'})
     assert response.status_code == 500
+
+def test_register_user(testing_client):
+    """
+    GIVEN a Flask application
+    WHEN registering a new user
+    THEN check the response is valid
+    """
+    response = testing_client.post('/register', json={
+        'name': 'John Doe',
+        'email': 'jdoe@email.com',
+        'password': 'password',
+        'country': 'Spain',
+        'state': 'Madrid',
+        'date_of_birth': '1980-01-01',
+        'role': 'user',
+        'status': 'Active'
+    })
+    assert response.status_code == 200
+    
+    
+def test_login_user(testing_client):
+    """
+    GIVEN a Flask application
+    WHEN logging in a user
+    THEN check the response is valid
+    """
+    response = testing_client.post('/login', json={
+        'email': 'jdoe@email.com',
+        'password': 'password'
+    })
+    
+    assert response.status_code == 200
+    
+def test_login_user_wrong_password(testing_client):
+    """
+    GIVEN a Flask application
+    WHEN logging in a user with the wrong password
+    THEN check the response is valid
+    """
+    response = testing_client.post('/login', json={
+        'email': 'jdoe@email.com',
+        'password': 'wrong_password'
+    })
+    
+    assert response.status_code == 401
+    
+def test_login_user_wrong_email(testing_client):
+    """
+    GIVEN a Flask application
+    WHEN logging in a user with the wrong email
+    THEN check the response is valid
+    """
+    response = testing_client.post('/login', json={
+        'email': 'wrong_email',
+        'password': 'password'
+    })
+    
+    assert response.status_code == 401
+    

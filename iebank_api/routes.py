@@ -1,6 +1,6 @@
 from flask import Flask, request, abort
 from iebank_api import db, app
-from iebank_api.models import Account, User
+from iebank_api.models import Account, User, Transaction
 # imports hash funtion to encrypt the password
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -95,6 +95,7 @@ def format_user(user):
         'role': user.role,
         'status': user.status
     }
+    
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -137,3 +138,18 @@ def login():
         return format_user(user)
     else:
         abort(500)
+        
+@app.route('/users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    return {'users': [format_user(user) for user in users]}
+
+@app.route('/users/<int:id>', methods=['GET'])
+def get_user(id):
+    user = User.query.get(id)
+    if not user:
+        abort(500)
+    return format_user(user)
+
+
+
