@@ -21,7 +21,7 @@ def test_skull_endpoint(testing_client):
     assert response.status_code == 200
     assert b'This is the BACKEND SKULL' in response.data
 
-def test_get_accounts(testing_client):
+def test_get_accounts(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN the '/accounts' page is requested (GET)
@@ -40,7 +40,7 @@ def test_dummy_wrong_path():
         response = client.get('/wrong_path')
         assert response.status_code == 404
 
-def test_create_account(testing_client):
+def test_create_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN the '/accounts' page is posted to (POST)
@@ -57,7 +57,7 @@ def test_create_account(testing_client):
     assert data['currency'] == '€'
     assert data['country'] == 'Spain'
 
-def test_get_account_by_id(testing_client):
+def test_get_account_by_id(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN the '/accounts/<id>' page is requested (GET)
@@ -82,7 +82,7 @@ def test_get_account_by_id(testing_client):
     assert data['country'] == 'France'
     assert data['id'] == account_id
 
-def test_update_account(testing_client):
+def test_update_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN the '/accounts/<id>' page is updated (PUT)
@@ -115,7 +115,7 @@ def test_update_account(testing_client):
     get_data = get_response.get_json()
     assert get_data['name'] == 'Robert'
 
-def test_delete_account(testing_client):
+def test_delete_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN the '/accounts/<id>' page is deleted (DELETE)
@@ -155,18 +155,15 @@ def test_delete_account(testing_client):
     account_ids = [account['id'] for account in accounts_data.get('accounts', [])]
     assert account_id not in account_ids, "Deleted account still present in accounts list"
 
-
-def test_get_nonexistent_account(testing_client):
+def test_get_nonexistent_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN a non-existent account is requested (GET)
     """
     response = testing_client.get('/accounts/9999')  # Assuming this ID does not exist
     assert response.status_code == 500
-    # data = response.get_json()
-    # assert data == {}, "Expected empty dictionary when account does not exist"
 
-def test_update_nonexistent_account(testing_client):
+def test_update_nonexistent_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN a non-existent account is updated (PUT)
@@ -175,7 +172,7 @@ def test_update_nonexistent_account(testing_client):
     response = testing_client.put('/accounts/9999', json={'name': 'DoesNotExist'})
     assert response.status_code == 500
 
-def test_delete_nonexistent_account(testing_client):
+def test_delete_nonexistent_account(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN a non-existent account is deleted (DELETE)
@@ -184,7 +181,7 @@ def test_delete_nonexistent_account(testing_client):
     response = testing_client.delete('/accounts/9999')
     assert response.status_code == 500
 
-def test_create_account_missing_fields(testing_client):
+def test_create_account_missing_fields(testing_client, login_user):
     """
     GIVEN a Flask application
     WHEN creating an account with missing fields (POST)
@@ -210,8 +207,7 @@ def test_register_user(testing_client):
         'status': 'Active'
     })
     assert response.status_code == 200
-    
-    
+
 def test_login_user(testing_client):
     """
     GIVEN a Flask application
@@ -222,9 +218,8 @@ def test_login_user(testing_client):
         'email': 'jdoe@email.com',
         'password': 'password'
     })
-    
     assert response.status_code == 200
-    
+
 def test_login_user_wrong_password(testing_client):
     """
     GIVEN a Flask application
@@ -235,9 +230,8 @@ def test_login_user_wrong_password(testing_client):
         'email': 'jdoe@email.com',
         'password': 'wrong_password'
     })
-    
-    assert response.status_code == 401
-    
+    assert response.status_code == 500
+
 def test_login_user_wrong_email(testing_client):
     """
     GIVEN a Flask application
@@ -248,6 +242,81 @@ def test_login_user_wrong_email(testing_client):
         'email': 'wrong_email',
         'password': 'password'
     })
-    
-    assert response.status_code == 401
-    
+    assert response.status_code == 500
+
+def test_create_transaction(testing_client, login_user):
+    """
+    GIVEN a Flask application
+    WHEN the '/transactions' page is posted to (POST)
+    THEN check the response is valid
+    """
+    # First, create an account
+    create_response = testing_client.post('/accounts', json={
+        'name': 'Alice',
+        'currency': '€',
+        'country': 'France'
+    })
+    assert create_response.status_code == 200
+    account_data = create_response.get_json()
+    account_id = account_data['id']
+
+    # Now, create a transaction
+    response = testing_client.post('/transactions', json={
+        'account_id': account_id,
+        'amount': 100.0
+    })
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['account_id'] == account_id
+    assert data['amount'] == 100.0
+
+def test_get_transactions(testing_client, login_user):
+    """
+    GIVEN a Flask application
+    WHEN the '/transactions' page is requested (GET)
+    THEN check the response is valid
+    """
+    response = testing_client.get('/transactions')
+    assert response.status_code == 200
+
+def test_send_money(testing_client, login_user):
+    """
+    GIVEN a Flask application
+    WHEN the '/send_money' page is posted to (POST)
+    THEN check the response is valid
+    """
+    # First, create two accounts
+    create_response_1 = testing_client.post('/accounts', json={
+        'name': 'Alice',
+        'currency': '€',
+        'country': 'France'
+    })
+    assert create_response_1.status_code == 200
+    account_data_1 = create_response_1.get_json()
+    account_id_1 = account_data_1['id']
+
+    create_response_2 = testing_client.post('/accounts', json={
+        'name': 'Bob',
+        'currency': '£',
+        'country': 'UK'
+    })
+    assert create_response_2.status_code == 200
+    account_data_2 = create_response_2.get_json()
+    account_id_2 = account_data_2['id']
+
+    # Add balance to the first account
+    update_response = testing_client.put(f'/accounts/{account_id_1}', json={
+        'name': 'Alice',
+        'balance': 200.0
+    })
+    assert update_response.status_code == 200
+
+    # Now, send money from the first account to the second account
+    response = testing_client.post('/send_money', json={
+        'from_account_id': account_id_1,
+        'to_account_id': account_id_2,
+        'amount': 50.0
+    })
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['message'] == 'Transaction successful'

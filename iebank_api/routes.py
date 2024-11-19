@@ -1,8 +1,9 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, session
 from iebank_api import db, app
 from iebank_api.models import Account, User, Transaction
-# imports hash funtion to encrypt the password
 from werkzeug.security import generate_password_hash, check_password_hash
+
+app.secret_key = 'your_secret_key'
 
 @app.route('/')
 def hello_world():
@@ -23,9 +24,11 @@ def skull():
         text = text +'<br/>Database password:' + db.engine.url.password
     return text
 
-
 @app.route('/accounts', methods=['POST'])
 def create_account():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     data = request.get_json()
     required_fields = ['name', 'currency', 'country']
     if not data or not all(field in data for field in required_fields):
@@ -40,14 +43,19 @@ def create_account():
     db.session.commit()
     return format_account(account)
 
-
 @app.route('/accounts', methods=['GET'])
 def get_accounts():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     accounts = Account.query.all()
     return {'accounts': [format_account(account) for account in accounts]}
 
 @app.route('/accounts/<int:id>', methods=['GET'])
 def get_account(id):
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     account = Account.query.get(id)
     if not account:
         abort(500)
@@ -55,6 +63,9 @@ def get_account(id):
 
 @app.route('/accounts/<int:id>', methods=['PUT'])
 def update_account(id):
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     account = Account.query.get(id)
     if not account:
         abort(500)
@@ -64,6 +75,9 @@ def update_account(id):
 
 @app.route('/accounts/<int:id>', methods=['DELETE'])
 def delete_account(id):
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     account = Account.query.get(id)
     if not account:
         abort(500)
@@ -82,7 +96,6 @@ def format_account(account):
         'created_at': account.created_at,
         'country': account.country
     }
-    
 
 def format_user(user):
     return {
@@ -95,7 +108,14 @@ def format_user(user):
         'role': user.role,
         'status': user.status
     }
-    
+
+def format_transaction(transaction):
+    return {
+        'id': transaction.id,
+        'account_id': transaction.account_id,
+        'amount': transaction.amount,
+        'status': transaction.status
+    }
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -122,7 +142,6 @@ def register():
     
     return format_user(new_user)
 
-
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -135,21 +154,86 @@ def login():
         abort(500)
     
     if check_password_hash(user.password, data['password']):
+        session['user_id'] = user.id
         return format_user(user)
     else:
         abort(500)
-        
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.pop('user_id', None)
+    return {'message': 'Logged out successfully'}
+
 @app.route('/users', methods=['GET'])
 def get_users():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     users = User.query.all()
     return {'users': [format_user(user) for user in users]}
 
 @app.route('/users/<int:id>', methods=['GET'])
 def get_user(id):
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
     user = User.query.get(id)
     if not user:
         abort(500)
     return format_user(user)
 
+@app.route('/transactions', methods=['POST'])
+def create_transaction():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
 
+    data = request.get_json()
+    required_fields = ['account_id', 'amount']
+    if not data or not all(field in data for field in required_fields):
+        abort(500)
+    
+    account_id = data['account_id']
+    amount = data['amount']
+    
+    transaction = Transaction(account_id=account_id, amount=amount)
+    db.session.add(transaction)
+    db.session.commit()
+    
+    return format_transaction(transaction)
 
+@app.route('/transactions', methods=['GET'])
+def get_transactions():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    if not user:
+        abort(500)
+
+    transactions = Transaction.query.filter_by(account_id=user.account_id).all()
+    return {'transactions': [format_transaction(transaction) for transaction in transactions]}
+
+@app.route('/send_money', methods=['POST'])
+def send_money():
+    if 'user_id' not in session:
+        abort(401)  # Unauthorized
+
+    data = request.get_json()
+    required_fields = ['from_account_id', 'to_account_id', 'amount']
+    if not data or not all(field in data for field in required_fields):
+        abort(500)
+
+    from_account = Account.query.get(data['from_account_id'])
+    to_account = Account.query.get(data['to_account_id'])
+    amount = data['amount']
+
+    if not from_account or not to_account or from_account.balance < amount:
+        abort(500)
+
+    from_account.balance -= amount
+    to_account.balance += amount
+
+    db.session.commit()
+
+    return {'message': 'Transaction successful'}
